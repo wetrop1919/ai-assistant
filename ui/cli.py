@@ -241,6 +241,23 @@ class AdvancedCLI:
 
         md = self.formatter.format_markdown(help_content)
         self.output_manager.print(md)
+        
+    async def _show_learning_dashboard(self) -> None:
+        """Показать дашборд обучения."""
+        if self.brain.dashboard:
+            self.brain.dashboard.show_main_dashboard()
+
+    async def _rate_last_response(self) -> None:
+        """Оценить последний ответ."""
+        # Запрашиваем оценку
+        prompt = "Как вы оцените последний ответ? (1-5, где 5 - отлично): "
+        try:
+            rating = int(input(prompt))
+            if 1 <= rating <= 5:
+                # Записываем отзыв
+                self.formatter.print_success(f"✅ Спасибо за оценку: {rating}/5")
+        except ValueError:
+            self.formatter.print_warning("⚠️ Пожалуйста, введите число от 1 до 5")
 
     async def handle_command(self, command: str) -> bool:
         """
@@ -324,6 +341,15 @@ class AdvancedCLI:
         elif command.lower() == "/history":
             await self._show_history()
             return True
+        
+        elif command.lower() == "/learning":
+            await self._show_learning_dashboard()
+
+        elif command.lower() == "/rate":
+            await self._rate_last_response()
+
+        elif command.lower() == "/proactive":
+            await self.brain.run_proactive_analysis()
 
         else:
             # Проверяем — это неизвестная команда (начинается с /)

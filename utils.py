@@ -14,7 +14,7 @@ class AsciiArt:
     BANNER = r"""
     ╔═════════════════════════════════════════════════════════════╗
     ║                                                             ║
-    ║            🤖  AI ASSISTANT v0.1.5  🤖                      ║
+    ║            🤖  AI ASSISTANT v0.2.1  🤖                      ║
     ║                                                             ║
     ║         Personal AI Assistant with Voice & Memory           ║
     ║                                                             ║

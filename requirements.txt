@@ -104,3 +104,15 @@ emoji==2.8.0
 
 # Color names
 colorama==0.4.6
+
+# Голос и речь
+faster-whisper==0.10.0
+pyttsx3==2.90
+pyaudio==0.2.13
+sounddevice==0.4.6
+soundfile==0.12.1
+numpy==1.26.3
+scipy==1.11.4
+librosa==0.10.0
+webrtcvad==4.3.1
+python-dotenv==1.0.0

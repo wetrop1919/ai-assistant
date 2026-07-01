@@ -1,5 +1,11 @@
 """
-Обновленная точка входа с новыми флагами.
+Финальная версия AI Assistant.
+
+Быстрый старт:
+    python main.py --cli                    # Текстовый режим
+    python main.py --voice                  # Голосовой режим
+    python main.py --server --port 8000     # REST API сервер
+    python main.py --daemon                 # Фоновый сервис
 """
 
 import asyncio
@@ -9,24 +15,19 @@ import argparse
 from pathlib import Path
 from typing import Optional
 import signal
-import os
+import traceback
 
-import yaml
 from rich.console import Console
 
 from logger import setup_logger, get_logger
-from config import Config
+from config import config, AppConfig
 from core.brain import Brain
 from core.enhanced_memory import EnhancedMemory
-from core.ears import Ears
-from core.voice import Voice
-from core.security import SecurityManager
-from security.policies import PolicyManager, PolicyProfile
 from ui.cli import AdvancedCLI
-from ui.themes import get_theme_manager
 from integrations import init_manager
 from utils import AsciiArt, ProgressBar
 
+# Инициализируем логирование
 setup_logger(
     log_level=config.logging.log_level,
     log_file=config.logging.log_file,
@@ -35,6 +36,7 @@ setup_logger(
 
 logger = get_logger(__name__)
 console = Console()
+
 
 class Assistant:
     """Главный класс ассистента."""
@@ -47,7 +49,6 @@ class Assistant:
             args: Аргументы командной строки
         """
         self.args = args
-        self.config = self._load_config(args.config)
         self.brain: Optional[Brain] = None
         self.memory: Optional[EnhancedMemory] = None
         self.cli: Optional[AdvancedCLI] = None
@@ -56,34 +57,23 @@ class Assistant:
         self._setup_logging()
         self._setup_security()
 
-    def _load_config(self, config_path: str) -> Config:
-        """Загрузить конфигурацию."""
-        try:
-            with open(config_path, "r") as f:
-                config_data = yaml.safe_load(f)
-
-            logger.info(f"✅ Конфигурация загружена: {config_path}")
-            return Config(**config_data)
-
-        except FileNotFoundError:
-            logger.warning(f"⚠️ Конфиг не найден: {config_path}, используем defaults")
-            from config import config
-            return config
-
     def _setup_logging(self) -> None:
         """Настроить логирование."""
         log_level = "DEBUG" if self.args.debug else "INFO"
         setup_logger(log_level=log_level)
 
         logger.info("=" * 70)
-        logger.info(f"🚀 Запуск AI Assistant v{self.config.version}")
+        logger.info(f"🚀 Запуск AI Assistant v{config.version}")
         logger.info(f"   Режим: {self.args.mode}")
         logger.info(f"   Sandbox: {self.args.sandbox}")
         logger.info(f"   Debug: {self.args.debug}")
+        logger.info(f"   Advanced: {self.args.advanced}")
         logger.info("=" * 70)
 
     def _setup_security(self) -> None:
         """Настроить безопасность."""
+        from security.policies import PolicyManager, PolicyProfile
+
         sandbox_levels = {
             "strict": PolicyProfile.STRICT,
             "balanced": PolicyProfile.BALANCED,
@@ -114,16 +104,19 @@ class Assistant:
             print("\n1️⃣  Инициализация мозга...")
             with ProgressBar.create_bar_manual(total=100, desc="Brain") as pbar:
                 self.brain = Brain(
-                    enable_rag=self.args.mode != "voice",
-                    enable_multimodal=self.args.mode != "voice",
+                    enable_rag=self.args.advanced,
+                    enable_multimodal=self.args.advanced,
                 )
                 pbar.update(50)
 
                 try:
-                    self.brain.check_connection()
+                    if hasattr(self.brain, 'check_connection'):
+                        self.brain.check_connection()
                     pbar.update(100)
                 except Exception as e:
                     logger.error(f"❌ Ollama недоступна: {e}")
+                    print("\n💡 Убедитесь, что Ollama запущена:")
+                    print("   ollama serve")
                     return False
 
             # 2. Память
@@ -143,12 +136,20 @@ class Assistant:
                 self.cli = AdvancedCLI(
                     brain=self.brain,
                     memory=self.memory,
-                    advanced=self.args.model == "auto",
+                    advanced=self.args.advanced,
                 )
 
             elif self.args.mode == "server":
                 await self._init_server()
 
+            elif self.args.mode == "voice":
+                from ui.voice_cli import VoiceCLI
+                
+                self.voice_cli = VoiceCLI(
+                    brain=self.brain,
+                    memory=self.memory,
+                )
+                
             elif self.args.mode == "daemon":
                 await self._init_daemon()
 
@@ -157,15 +158,19 @@ class Assistant:
 
         except Exception as e:
             logger.error(f"❌ Ошибка инициализации: {e}", exc_info=True)
+            traceback.print_exc()
             return False
 
     async def _init_server(self) -> None:
         """Инициализировать REST API сервер."""
-        from api.server import APIServer
+        try:
+            from api.server import APIServer
 
-        port = self.args.port or 8000
-        self.server = APIServer(self.brain, self.memory, port=port)
-        logger.info(f"🌐 API сервер готов на http://localhost:{port}")
+            port = self.args.port or 8000
+            self.server = APIServer(self.brain, self.memory, port=port)
+            logger.info(f"🌐 API сервер готов на http://localhost:{port}")
+        except ImportError:
+            logger.warning("⚠️ API сервер не доступен")
 
     async def _init_daemon(self) -> None:
         """Инициализировать фоновый сервис."""
@@ -182,13 +187,18 @@ class Assistant:
 
             # Запускаем режим
             if self.args.mode == "cli":
-                await self.cli.run()
+                if self.cli:
+                    await self.cli.run()
 
             elif self.args.mode == "voice":
                 await self._run_voice_mode()
 
             elif self.args.mode == "server":
                 await self._run_server_mode()
+                
+            elif self.args.mode == "voice":
+                if hasattr(self, 'voice_cli'):
+                    await self.voice_cli.run()
 
             elif self.args.mode == "daemon":
                 await self._run_daemon_mode()
@@ -204,17 +214,14 @@ class Assistant:
         """Запустить голосовой режим."""
         print("\n🎤 Голосовой режим активирован")
         print("Слушаю... (Ctrl+C для выхода)")
-
-        # Здесь будет голосовой интерфейс
-        # Пока имитируем
         await asyncio.sleep(1)
 
     async def _run_server_mode(self) -> None:
         """Запустить серверный режим."""
-        print(f"\n🌐 Сервер запущен на http://localhost:{self.args.port or 8000}")
+        port = self.args.port or 8000
+        print(f"\n🌐 Сервер запущен на http://localhost:{port}")
         print("Ctrl+C для остановки")
 
-        # Бесконечный цикл
         try:
             while self.running:
                 await asyncio.sleep(1)
@@ -225,10 +232,8 @@ class Assistant:
         """Запустить режим демона."""
         print("\n🌙 Демон работает в фоне")
 
-        # Бесконечный цикл для фонового процесса
         try:
             while self.running:
-                # Индексация, бэкапы и т.д.
                 await asyncio.sleep(60)
         except KeyboardInterrupt:
             pass
@@ -238,7 +243,6 @@ class Assistant:
         logger.info("🏁 Завершение работы...")
         self.running = False
 
-        # Сохраняем состояние
         if self.memory:
             logger.info("💾 Сохранение памяти...")
 
@@ -254,13 +258,14 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Примеры использования:
-  assistant run --mode cli                      # Текстовый режим
-  assistant run --mode voice                    # Голосовой режим
-  assistant run --mode server --port 8000       # REST API
-  assistant run --mode daemon                   # Фоновый режим
-  assistant run --sandbox strict                # Максимальная безопасность
-  assistant run --debug                         # Режим отладки
-  assistant run --profile                       # Профилирование
+  python main.py --mode cli                      # Текстовый режим (по умолчанию)
+  python main.py --mode cli --advanced           # Текстовый режим с Advanced
+  python main.py --mode voice                    # Голосовой режим
+  python main.py --mode server --port 8000       # REST API
+  python main.py --mode daemon                   # Фоновый режим
+  python main.py --sandbox strict                # Максимальная безопасность
+  python main.py --debug                         # Режим отладки
+  python main.py --profile                       # Профилирование
         """,
     )
 
@@ -270,6 +275,13 @@ def parse_arguments() -> argparse.Namespace:
         choices=["cli", "voice", "server", "daemon"],
         default="cli",
         help="Режим работы (по умолчанию: cli)",
+    )
+
+    # Advanced
+    parser.add_argument(
+        "--advanced",
+        action="store_true",
+        help="Включить Advanced режим (RAG + Multimodal)",
     )
 
     # Безопасность
@@ -285,13 +297,6 @@ def parse_arguments() -> argparse.Namespace:
         "--model",
         default="auto",
         help="Модель LLM (по умолчанию: auto)",
-    )
-
-    # Конфигурация
-    parser.add_argument(
-        "--config",
-        default="config.yaml",
-        help="Файл конфигурации (по умолчанию: config.yaml)",
     )
 
     # Рабочее пространство
@@ -326,7 +331,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 0.2.0",
+        version=f"%(prog)s {config.version}",
     )
 
     return parser.parse_args()
@@ -334,26 +339,28 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> None:
     """Главная функция."""
-    args = parse_arguments()
-
-    # Создаем и запускаем ассистент
-    assistant = Assistant(args)
-
-    # Обработчик сигналов
-    def signal_handler(sig, frame):
-        logger.info("⏹️ Получен сигнал завершения")
-        asyncio.create_task(assistant.shutdown())
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
-    # Запускаем асинхронный цикл
     try:
+        args = parse_arguments()
+
+        # Создаем и запускаем ассистент
+        assistant = Assistant(args)
+
+        # Обработчик сигналов
+        def signal_handler(sig, frame):
+            logger.info("⏹️ Получен сигнал завершения")
+            asyncio.create_task(assistant.shutdown())
+
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        # Запускаем асинхронный цикл
         asyncio.run(assistant.run())
+
     except KeyboardInterrupt:
-        pass
+        logger.info("👋 До встречи!")
     except Exception as e:
         logger.error(f"❌ Критическая ошибка: {e}", exc_info=True)
+        traceback.print_exc()
         sys.exit(1)
 
 

@@ -7,6 +7,7 @@ import logging
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 import requests
+import uuid
 
 from config import config
 from .rag import RAGSystem
@@ -23,9 +24,13 @@ except ImportError:
     def get_manager():
         return None
 from core.security import SecurityManager
+from core.voice_system import VoiceSystem
 from security.policies import PolicyManager, PolicyProfile
 from security.confirmation import ConfirmationManager
 from security.recovery import RecoveryManager
+from core.learning import LearningEngine, UserFeedback
+from core.proactive import ProactiveAgent
+from analytics.dashboard import Dashboard
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +128,87 @@ class Brain:
         self.recovery_manager = RecoveryManager()
 
         logger.info("🔒 Безопасность инициализирована")
+        
+        self.learning_engine = LearningEngine()
+        self.proactive_agent = ProactiveAgent(
+            learning_engine=self.learning_engine,
+            brain=self,
+        )
+        self.dashboard = Dashboard(learning_engine=self.learning_engine)
 
+        logger.info("🧠 Модули обучения инициализированы")
+
+    async def generate_adaptive(
+        self,
+        prompt: str,
+        context: Optional[List[Dict[str, str]]] = None,
+        use_rag: bool = True,
+    ) -> str:
+        """
+        Генерировать ответ с адаптацией.
+
+        Args:
+            prompt: Текст запроса
+            context: Контекст диалога
+            use_rag: Использовать RAG
+
+        Returns:
+            Адаптированный ответ
+        """
+        response_id = str(uuid.uuid4())
+
+        try:
+            # Получаем адаптированный system prompt
+            system_prompt = self.learning_engine.get_system_prompt_adjustment()
+
+            # Выполняем с адаптированным промптом
+            start_time = asyncio.get_event_loop().time()
+
+            answer = await self.generate(
+                prompt=prompt,
+                context=context,
+                use_rag=use_rag,
+            )
+
+            execution_time = asyncio.get_event_loop().time() - start_time
+
+            # Логируем для обучения
+            self.learning_engine.log_response(
+                response_id=response_id,
+                query=prompt,
+                response=answer,
+                model_used=self.default_model,
+                execution_time=execution_time,
+                tags=self._extract_tags(prompt),
+            )
+
+            return answer
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка адаптивной генерации: {e}")
+            raise
+            
+        self.voice_system = VoiceSystem(
+            tts_engine=config.speech.tts_engine,
+            stt_model=config.speech.whisper_model,
+            language=config.speech.whisper_language,
+        )
+
+        logger.info("🎤 Система голоса инициализирована")
+
+    async def listen_user_input(self) -> Optional[str]:
+        """
+        Слушать речь пользователя.
+
+        Returns:
+            Распознанный текст или None
+        """
+        try:
+            success, text = await self.voice_system.listen_and_transcribe()
+            return text if success else None
+        except Exception as e:
+            logger.error(f"❌ Ошибка распознавания: {e}")
+            return None
 
     def _register_integrations(self) -> None:
         """Зарегистрировать интеграции."""
@@ -135,37 +220,37 @@ class Brain:
         from integrations.notifier import NotifierIntegration
 
         # Регистрируем только если включены
-        if config.integrations.CALENDAR_ENABLED:
+        if config.integrations.calendar_enabled:
             self.integration_manager.register(
                 "calendar",
                 CalendarIntegration(config.integrations.dict()),
             )
 
-        if config.integrations.EMAIL_ENABLED:
+        if config.integrations.email_enabled:
             self.integration_manager.register(
                 "email",
                 EmailIntegration(config.integrations.dict()),
             )
 
-        if config.integrations.TODO_ENABLED:
+        if config.integrations.todo_enabled:
             self.integration_manager.register(
                 "todo",
                 TodoIntegration(config.integrations.dict()),
             )
 
-        if config.integrations.SMART_HOME_ENABLED:
+        if config.integrations.smart_home_enabled:
             self.integration_manager.register(
                 "smart_home",
                 SmartHomeIntegration(config.integrations.dict()),
             )
 
-        if config.integrations.MEDIA_ENABLED:
+        if config.integrations.media_enabled:
             self.integration_manager.register(
                 "media",
                 MediaIntegration(config.integrations.dict()),
             )
 
-        if config.integrations.NOTIFIER_ENABLED:
+        if config.integrations.notifier_enabled:
             self.integration_manager.register(
                 "notifier",
                 NotifierIntegration(config.integrations.dict()),
@@ -333,6 +418,19 @@ class Brain:
         """Валидировать команду."""
         valid, level, reason = self.security_manager.validate_command(command)
         return valid, level.name, reason
+        
+    def speak_response(self, text: str, wait: bool = False) -> None:
+        """
+        Произнести ответ.
+
+        Args:
+            text: Текст для произнесения
+            wait: Ждать завершения
+        """
+        try:
+            self.voice_system.speak(text, wait=wait)
+        except Exception as e:
+            logger.error(f"❌ Ошибка произнесения: {e}")
 
     def get_security_status(self) -> Dict[str, Any]:
         """Получить статус безопасности."""
@@ -349,6 +447,60 @@ class Brain:
             ProcessingLevel.CODE: config.ollama.temperature_code,
         }
         return temp_map.get(level, config.ollama.temperature_general)
+        
+    def record_user_feedback(
+        self,
+        response_id: str,
+        rating: int,
+        feedback_text: Optional[str] = None,
+    ) -> None:
+        """
+        Записать отзыв пользователя.
+
+        Args:
+            response_id: ID ответа
+            rating: Оценка (1-5)
+            feedback_text: Текст отзыва
+        """
+        if rating >= 4:
+            feedback_type = UserFeedback.POSITIVE
+        elif rating <= 2:
+            feedback_type = UserFeedback.NEGATIVE
+        else:
+            feedback_type = UserFeedback.NEUTRAL
+
+        self.learning_engine.record_feedback(
+            response_id=response_id,
+            feedback_type=feedback_type,
+            quality_score=rating,
+        )
+    def _extract_tags(self, query: str) -> List[str]:
+        """Извлечь теги из запроса."""
+        tags = []
+
+        if "код" in query.lower() or "python" in query.lower():
+            tags.append("coding")
+
+        if "файл" in query.lower() or "папка" in query.lower():
+            tags.append("filesystem")
+
+        if "интернет" in query.lower() or "сетевой" in query.lower():
+            tags.append("network")
+
+        return tags
+
+    async def run_proactive_analysis(self) -> None:
+        """Запустить проактивный анализ."""
+        actions = await self.proactive_agent.analyze_and_predict()
+
+        for action in actions:
+            logger.info(f"🎯 Проактивное действие: {action.message}")
+            # Можем отправить уведомление пользователю
+
+    def show_dashboard(self) -> None:
+        """Показать дашборд обучения."""
+        self.dashboard.show_main_dashboard()
+        self.dashboard.show_quality_trends()
 
     def get_status(self) -> Dict[str, Any]:
         """Получить статус мозга."""
