@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-network
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ai-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadb_data:/chroma/data
+    environment:
+      - CHROMA_DB_IMPL=duckdb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-network
+
+  assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-assistant
+    depends_on:
+      ollama:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - PYTHONUNBUFFERED=1
+      - SECURITY_SANDBOX_LEVEL=balanced
+    volumes:
+      - ./workspace:/app/workspace
+      - ./logs:/app/logs
+      - ~/.assistant:/root/.assistant
+    ports:
+      - "8001:8001"
+    networks:
+      - ai-network
+    command: python main.py --mode server --port 8001
+
+volumes:
+  ollama_data:
+    driver: local
+  chromadb_data:
+    driver: local
+
+networks:
+  ai-network:
+    driver: bridge

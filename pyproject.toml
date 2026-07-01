@@ -1,0 +1,121 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-assistant"
+version = "0.2.1"
+description = "Персональный AI ассистент с полным доступом к системе"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Mefodiy", email = "mef7608084@gmail.com"}
+]
+keywords = ["ai", "assistant", "ollama", "rag", "multimodal"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "python-dotenv==1.0.0",
+    "pydantic==2.5.3",
+    "pydantic-settings==2.1.0",
+    "requests==2.31.0",
+    "aiohttp==3.9.1",
+    "rich==13.7.0",
+    "prompt-toolkit==3.0.43",
+    "colorama==0.4.6",
+    "emoji==2.8.0",
+    "chromadb==0.4.24",
+    "sentence-transformers==2.2.2",
+    "sqlalchemy==2.0.23",
+    "networkx==3.2",
+    "numpy==1.26.3",
+    "scipy==1.11.4",
+    "scikit-learn==1.3.2",
+    "fuzzywuzzy==0.18.0",
+    "PyPDF2==3.0.1",
+    "python-docx==0.8.11",
+    "Pillow==10.1.0",
+    "pytesseract==0.3.10",
+    "tqdm==4.66.1",
+    "psutil==5.9.6",
+    "pyyaml==6.0",
+    "restrictedpython==6.0",
+    "cryptography==41.0.7",
+    "prometheus-client==0.19.0",
+    "aiofiles==23.2.1",
+    "cachetools==5.3.2",
+    "ratelimit==2.2.1",
+    "faster-whisper==0.10.0",
+    "pyttsx3==2.90",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==7.4.4",
+    "pytest-asyncio==0.23.3",
+    "pytest-cov==4.1.0",
+    "pytest-benchmark==4.0.0",
+    "black==23.12.1",
+    "flake8==6.1.0",
+    "mypy==1.7.1",
+    "ruff==0.1.11",
+    "pre-commit==3.5.0",
+]
+
+docker = [
+    "docker==6.1.0",
+]
+
+integrations = [
+    "google-auth-oauthlib==1.0.0",
+    "google-api-python-client==2.100.0",
+    "aioimaplib==1.0.1",
+    "aiosmtplib==3.0.1",
+    "todoist-api-python==2.1.2",
+    "paho-mqtt==1.6.1",
+    "spotipy==2.23.0",
+    "GitPython==3.1.40",
+    "plyer==2.1.0",
+    "python-telegram-bot==20.5",
+    "dropbox==11.36.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/wetrop1919/ai-assistant"
+Documentation = "https://ai-assistant.readthedocs.io"
+Repository = "https://github.com/wetrop1919/ai-assistant"
+"Bug Tracker" = "https://github.com/wetrop1919/ai-assistant/issues"
+
+[project.scripts]
+assistant = "cli.main:main"
+
+[tool.setuptools]
+packages = ["ai_assistant"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

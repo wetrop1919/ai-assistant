@@ -1,0 +1,87 @@
+# AI Assistant Configuration
+
+assistant:
+  name: "AI Assistant"
+  version: "0.2.1"
+  language: "ru"
+  wake_word: "ассистент"
+  description: "Персональный AI ассистент с полным доступом к системе"
+
+models:
+  default: "llama3:8b"
+  code: "codellama:13b"
+  fast: "phi3:mini"
+  embeddings: "all-MiniLM-L6-v2"
+
+ollama:
+  host: "http://localhost:11434"
+  timeout: 60
+  temperature_general: 0.7
+  temperature_code: 0.2
+  keep_alive: "5m"
+
+security:
+  sandbox_enabled: true
+  sandbox_level: "auto"  # auto, 1-5
+  code_execution: "sandbox"  # disabled, sandbox, full
+  network_access: "whitelist"  # blocked, whitelist, full
+  file_access: "workspace_only"  # readonly, workspace, full
+  require_confirmation: ["DANGEROUS", "CRITICAL"]
+  auto_deny_timeout: 30
+  audit_log_level: "INFO"
+  telemetry_enabled: false
+  workspace: "~/assistant_workspace"
+
+voice:
+  input_device: "auto"
+  output_device: "auto"
+  speech_speed: 1.0
+  wake_word_confidence: 0.9
+  whisper_model: "medium"
+  tts_engine: "pyttsx3"
+  language: "ru"
+
+ui:
+  theme: "dark"  # dark, light, cyberpunk, minimal, monokai
+  show_thinking: true
+  typing_speed: 0.02
+  pager_size: 20
+  enable_animations: true
+
+rag:
+  enabled: true
+  db_path: "rag_db"
+  embedding_model: "all-MiniLM-L6-v2"
+  top_k: 5
+  chunk_size: 500
+
+memory:
+  db_path: "memory.db"
+  short_term_size: 20
+  episodic_retention_days: 30
+  cleanup_interval_hours: 24
+
+logging:
+  log_level: "INFO"
+  log_file: "assistant.log"
+  log_format: "detailed"
+  max_size_mb: 100
+  backup_count: 5
+
+performance:
+  cache_embeddings: true
+  lazy_load_skills: true
+  connection_pool_size: 10
+  batch_processing: true
+  max_concurrent_tasks: 5
+
+integrations:
+  calendar_enabled: false
+  email_enabled: false
+  todo_enabled: false
+  smart_home_enabled: false
+  media_enabled: false
+  notifier_enabled: false
+
+# Environment-specific overrides
+# Override with environment variables like: ASSISTANT_MODELS_DEFAULT=llama3:70b
