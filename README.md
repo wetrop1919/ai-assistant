@@ -168,21 +168,72 @@ def bubble_sort(arr):
 ## 🏗️ Архитектура
 
 ```
-ai_assistant/
-├── core/              # Ядро приложения
-│   ├── brain.py       # Работа с Ollama
-│   ├── memory.py      # Система памяти
-│   ├── ears.py        # Speech-to-Text
-│   └── voice.py       # Text-to-Speech
-├── skills/            # Система навыков
-│   ├── base.py        # Базовый класс навыка
-│   └── registry.py    # Реестр навыков
-├── ui/                # Пользовательский интерфейс
-│   └── cli.py         # CLI интерфейс
-├── config.py          # Конфигурация
-├── logger.py          # Логирование
-├── utils.py           # Утилиты
-└── main.py            # Точка входа
+ai-assistant/
+├── ai_assistant/                 # Основной пакет
+│   ├── __init__.py
+│   ├── main.py                   # Точка входа
+│   ├── config.py                 # Конфигурация
+│   ├── core/
+│   │   ├── brain.py              # Основной мозг
+│   │   ├── memory.py             # Система памяти
+│   │   ├── security.py           # Безопасность
+│   │   ├── rag.py                # RAG система
+│   │   ├── router.py             # Маршрутизация
+│   │   ├── multimodal.py         # Мультимодальность
+│   │   ├── ears.py               # Распознавание речи
+│   │   └── voice.py              # Синтез речи
+│   ├── skills/
+│   │   ├── base.py               # Базовый навык
+│   │   ├── system.py             # Управление системой
+│   │   ├── files.py              # Файлы
+│   │   ├── web.py                # Веб-инструменты
+│   │   ├── automation.py         # Автоматизация
+│   │   ├── coding.py             # Программирование
+│   │   └── registry.py           # Реестр навыков
+│   ├── integrations/             # Интеграции
+│   │   ├── calendar.py
+│   │   ├── email.py
+│   │   ├── todo.py
+│   │   └── ...
+│   ├── ui/
+│   │   ├── cli.py                # Главный CLI
+│   │   ├── themes.py             # Темы
+│   │   ├── formatters.py         # Форматеры
+│   │   ├── animations.py         # Анимации
+│   │   ├── shortcuts.py          # Горячие клавиши
+│   │   └── input_handler.py      # Обработка ввода
+│   ├── security/
+│   │   ├── policies.py           # Политики
+│   │   ├── confirmation.py       # Подтверждения
+│   │   └── recovery.py           # Восстановление
+│   ├── api/
+│   │   └── server.py             # REST API
+│   └── utils/
+│       ├── logger.py
+│       ├── formatters.py
+│       └── ...
+├── tests/
+│   ├── test_security.py
+│   ├── test_skills.py
+│   ├── test_integrations.py
+│   └── ...
+├── docs/
+│   ├── architecture.md
+│   ├── api.md
+│   ├── skills.md
+│   └── ...
+├── Dockerfile
+├── docker-compose.yml
+├── Makefile
+├── config.yaml
+├── pyproject.toml
+├── requirements.txt
+├── README.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+└── .github/
+    └── workflows/
+        └── ci.yml
 ```
 
 ## ⚙️ Конфигурация
